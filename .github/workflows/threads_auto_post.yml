@@ -1,0 +1,22 @@
+name: ほのかエンプレイ Threads自動投稿
+
+# cronスケジュールは無効化
+# Coworkのスケジュールタスクから直接Threads APIを呼ぶ方式に変更
+on:
+  workflow_dispatch:
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    name: スレッドへの投稿
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+      - run: pip install requests anthropic
+      - env:
+          THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
+          THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python post_to_threads.py
