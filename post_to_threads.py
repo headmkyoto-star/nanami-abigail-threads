@@ -1,3 +1,4 @@
+import os
 import anthropic, requests, os, random, time
 
 ACCESS_TOKEN = os.environ.get("THREADS_ACCESS_TOKEN", "")
