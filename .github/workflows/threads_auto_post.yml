@@ -3,6 +3,8 @@ name: ななみアビゲイル Threads自動投稿
 # cronスケジュールは無効化
 # Coworkのスケジュールタスクから直接Threads APIを呼ぶ方式に変更
 on:
+  schedule:
+    - cron: "0 5 * * 0,1,2,5,6"  # JST 14:00 日月火金土 (水木休み)
   workflow_dispatch:
 
 jobs:
