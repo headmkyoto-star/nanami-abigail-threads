@@ -7,24 +7,30 @@ import time
 ACCESS_TOKEN = os.environ.get("THREADS_ACCESS_TOKEN", "")
 USER_ID = os.environ.get("THREADS_USER_ID", "")
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
 GITHUB_RAW_BASE = "https://raw.githubusercontent.com/headmkyoto-star/nanami-abigail-threads/main/"
 GITHUB_API_BASE = "https://api.github.com/repos/headmkyoto-star/nanami-abigail-threads/contents/"
 
 
 def list_media(folder, exts):
     try:
-        r = requests.get(GITHUB_API_BASE + folder, timeout=15)
+        headers = {"Authorization": f"token {GITHUB_TOKEN}"} if GITHUB_TOKEN else {}
+        r = requests.get(GITHUB_API_BASE + folder, headers=headers, timeout=15)
+        print(f"  list_media({folder!r}) status={r.status_code}")
         if r.status_code != 200:
             return []
         files = r.json()
         if not isinstance(files, list):
             return []
-        return [
+        names = [
             f["name"]
             for f in files
             if f.get("name", "").lower().endswith(exts)
         ]
-    except Exception:
+        print(f"  {folder!r} 内: {len(names)} 件のメディア")
+        return names
+    except Exception as e:
+        print(f"  list_media error: {e}")
         return []
 
 
