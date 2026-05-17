@@ -1,147 +1,159 @@
-import os
-import anthropic
-import requests
-import random
-import time
+import anthropic, requests, os, random, time
 
 ACCESS_TOKEN = os.environ.get("THREADS_ACCESS_TOKEN", "")
 USER_ID = os.environ.get("THREADS_USER_ID", "")
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
-GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
 GITHUB_RAW_BASE = "https://raw.githubusercontent.com/headmkyoto-star/nanami-abigail-threads/main/"
 GITHUB_API_BASE = "https://api.github.com/repos/headmkyoto-star/nanami-abigail-threads/contents/"
 
+OPENING_PHRASES = [
+    "関西の人で",
+    "📍祇園四条駅から徒歩5分",
+    "祇園四条駅のすぐ近くで",
+    "京都祇園で",
+    "京都の人で",
+]
 
-def list_media(folder, exts):
+MENUS = [
+    "ドライヘッドスパ 70分 3,980円",
+    "アロママッサージ",
+    "小顔矯正コルギ",
+]
+
+def get_media():
+    """動画9割・画像1割で選択（ななみアビゲイル仕様）"""
+    images = []
+    videos = []
     try:
-        headers = {"Authorization": f"token {GITHUB_TOKEN}"} if GITHUB_TOKEN else {}
-        r = requests.get(GITHUB_API_BASE + folder, headers=headers, timeout=15)
-        print(f"  list_media({folder!r}) status={r.status_code}")
-        if r.status_code != 200:
-            return []
-        files = r.json()
-        if not isinstance(files, list):
-            return []
-        names = [
-            f["name"]
-            for f in files
-            if f.get("name", "").lower().endswith(exts)
-        ]
-        print(f"  {folder!r} 内: {len(names)} 件のメディア")
-        return names
-    except Exception as e:
-        print(f"  list_media error: {e}")
-        return []
+        r = requests.get(GITHUB_API_BASE + "images")
+        if r.status_code == 200:
+            files = r.json()
+            if isinstance(files, list):
+                for f in files:
+                    name = f["name"].lower()
+                    if name.endswith((".jpg", ".jpeg", ".png", ".webp")):
+                        url = GITHUB_RAW_BASE + "images/" + f["name"].replace(" ", "_")
+                        images.append((url, "IMAGE"))
+    except: pass
+    try:
+        r = requests.get(GITHUB_API_BASE + "videos")
+        if r.status_code == 200:
+            files = r.json()
+            if isinstance(files, list):
+                for f in files:
+                    name = f["name"].lower()
+                    if name.endswith((".mp4", ".mov")):
+                        url = GITHUB_RAW_BASE + "videos/" + f["name"].replace(" ", "_")
+                        videos.append((url, "VIDEO"))
+    except: pass
 
-
-def pick_media():
-    """動画9割、画像1割でメディアを選ぶ。無ければテキスト投稿"""
-    videos = list_media("videos", (".mp4",))
-    images = list_media("images", (".jpg", ".jpeg", ".png", ".webp"))
-
-    # 動画9割 / 画像1割
-    if videos and (random.random() < 0.9 or not images):
-        name = random.choice(videos)
-        return ("VIDEO", GITHUB_RAW_BASE + "videos/" + name.replace(" ", "_"))
-    if images:
-        name = random.choice(images)
-        return ("IMAGE", GITHUB_RAW_BASE + "images/" + name.replace(" ", "_"))
-    return (None, None)
-
+    # 比率制御: 動画9割・画像1割
+    use_video = random.random() < 0.9
+    if use_video and videos:
+        return random.choice(videos)
+    elif images:
+        return random.choice(images)
+    elif videos:  # 画像がない場合は動画にフォールバック
+        return random.choice(videos)
+    return None, None
 
 def generate_post():
     client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
-    if random.random() < 0.2:
-        prompt = (
-            "ドライヘッドスパ専門サロン(ヘッドミント京都祇園店)のセラピスト"
-            "「ななみアビゲイル」として、営業系のThreads投稿文を作成してください。"
-            "・40〜55文字程度・絵文字基本1つ(1箇所は連続絵文字OK)・改行あり"
-            "・ハッシュタグなし・口語表現で自然な文章・余韻あり"
-            "・70分3,980円のメニューに触れてもOK"
-            "投稿本文のみ出力。"
-        )
-    else:
-        prompt = (
-            "ドライヘッドスパ専門サロンのセラピスト「ななみアビゲイル」として、"
-            "日常日記系のThreads投稿文を作成してください。"
-            "・40〜55文字程度・絵文字基本1つ(1箇所は連続絵文字OK)・改行あり"
-            "・ハッシュタグなし・口語表現で自然な文章・余韻あり"
-            "・営業色なし、その日の気持ち・施術中のエピソードなど"
-            "投稿本文のみ出力。"
-        )
+    opening = random.choice(OPENING_PHRASES)
+    menu = random.choice(MENUS)
+
+    prompt = f"""京都祇園のリラクゼーションサロン「ななみアビゲイル」の若い女性セラピストとして、Threadsの短い営業投稿を作成してください。
+
+【絶対ルール】
+- 投稿は **必ず以下の冒頭フレーズで始める**: 「{opening}」
+- メニューは「{menu}」を訴求する
+- 文字数は40〜70文字
+- 句読点（。、）は使わず、絵文字や改行で区切る
+- ハッシュタグは絶対なし
+- 改行は1〜2回程度
+- 絵文字は以下から3〜5個だけ使う: ✋ 😴 🫧 🙋‍♀️ 🪽 🐑 💤 👀 🥰 🤩 ❓ ✨ 🔥 💆
+- 若い女性セラピストの口調（〜ですー、〜ませんか、〜してくださーい等）
+
+【冒頭フレーズの位置】
+冒頭フレーズ「{opening}」は必ず投稿の最初に配置すること。例：
+- 「関西の人で」+ 「ヘッドスパ受けたい人いませんかー？🙋‍♀️」のように繋げる
+- 「📍祇園四条駅から徒歩5分」+ 「70分3,980円で癒します🥰」のように繋げる
+- 「京都祇園で」+ 「寝落ちしませんか🐑💤」のように繋げる
+
+【参考にする過去の実投稿（冒頭フレーズを付けたバージョン）】
+- 関西の人でオイルマッサージ受けたい人✋私の手で癒させてくださーい😴🫧
+- 📍祇園四条駅から徒歩5分 70分3980円でヘッドスパ受けたい人いますかー？🙋‍♀️ 私が全力で施術させていただきます🪽
+- 京都祇園で寝落ち率95%のヘッドスパ受けたい人いませんか🤩❓
+- 京都の人で 70分3,980円ぽっきりでスッキリしませんか🥰
+- 祇園四条駅のすぐ近くでドライヘッドスパ¥3,980で受けたい人🙋‍♀️私の手で癒させてください✨
+
+【NG】
+- 冒頭フレーズなしの投稿（必ず先頭に「{opening}」が来ること）
+- 70文字を超える長文
+- 絵文字を6個以上使う
+- 説明的・冗長な文章
+
+【出力】
+投稿文1パターンのみ出力。説明・前置き・結びの言葉は絶対不要。"""
+
     msg = client.messages.create(
         model="claude-opus-4-6",
         max_tokens=300,
-        messages=[{"role": "user", "content": prompt}],
+        messages=[{"role": "user", "content": prompt}]
     )
-    return msg.content[0].text.strip()
+    text = msg.content[0].text.strip()
+    text = text.replace("「", "").replace("」", "")
+    text = text.replace("。", "").replace("、", " ")
 
+    if not text.startswith(opening):
+        text = opening + " " + text
 
-def post_to_threads(text, media_type, media_url):
-    """Threadsへ投稿。media_type: 'IMAGE' / 'VIDEO' / None"""
-    base = f"https://graph.threads.net/v1.0/{USER_ID}/threads"
-    if media_type == "VIDEO" and media_url:
-        params = {
-            "media_type": "VIDEO",
-            "video_url": media_url,
-            "text": text,
-            "access_token": ACCESS_TOKEN,
-        }
-    elif media_type == "IMAGE" and media_url:
-        params = {
-            "media_type": "IMAGE",
-            "image_url": media_url,
-            "text": text,
-            "access_token": ACCESS_TOKEN,
-        }
+    return text
+
+def post_to_threads(text, media_url=None, media_type=None):
+    if media_type == "IMAGE":
+        params = {"media_type": "IMAGE", "image_url": media_url, "text": text, "access_token": ACCESS_TOKEN}
+        wait_sec = 30
+    elif media_type == "VIDEO":
+        params = {"media_type": "VIDEO", "video_url": media_url, "text": text, "access_token": ACCESS_TOKEN}
+        wait_sec = 60
     else:
-        params = {
-            "media_type": "TEXT",
-            "text": text,
-            "access_token": ACCESS_TOKEN,
-        }
+        params = {"media_type": "TEXT", "text": text, "access_token": ACCESS_TOKEN}
+        wait_sec = 5
 
-    r = requests.post(base, params=params, timeout=30)
-    print(f"📦 コンテナ作成 status={r.status_code}")
+    r = requests.post(f"https://graph.threads.net/v1.0/{USER_ID}/threads", params=params)
     if r.status_code != 200:
-        print(f"❌ {r.text}")
-        # 動画失敗ならテキストで再試行
-        if media_type == "VIDEO":
-            print("↺ 動画失敗、テキストで再試行")
+        print(f"❌ コンテナ作成失敗: {r.text}")
+        if media_type:
+            print("📝 テキストのみで再試行")
             return post_to_threads(text, None, None)
         return r
+
     cid = r.json().get("id")
-    print(f"   container_id: {cid}")
+    print(f"✅ コンテナ作成: {cid}")
+    print(f"⏳ {wait_sec}秒待機...")
+    time.sleep(wait_sec)
 
-    # 動画は処理時間が長いのでstatus確認しながら待つ
-    wait = 60 if media_type == "VIDEO" else 5
-    print(f"⏰ {wait}秒待機(媒体処理待ち)...")
-    time.sleep(wait)
-
-    publish_url = f"https://graph.threads.net/v1.0/{USER_ID}/threads_publish"
-    pr = requests.post(
-        publish_url,
-        params={"creation_id": cid, "access_token": ACCESS_TOKEN},
-        timeout=30,
+    return requests.post(
+        f"https://graph.threads.net/v1.0/{USER_ID}/threads_publish",
+        params={"creation_id": cid, "access_token": ACCESS_TOKEN}
     )
-    print(f"📤 publish status={pr.status_code}")
-    if pr.status_code != 200:
-        print(f"❌ publish失敗: {pr.text}")
-    return pr
 
+if not ACCESS_TOKEN or not USER_ID:
+    print("⚠️ Secrets未設定")
+    exit(1)
 
 text = generate_post()
 print(f"📝 投稿文 ({len(text)}文字):\n{text}\n")
 
-media_type, media_url = pick_media()
-if media_type:
-    print(f"🎬 メディア種別: {media_type}")
-    print(f"   URL: {media_url}\n")
+media_url, media_type = get_media()
+if media_url:
+    print(f"🎬 MEDIA_CHOSEN: type={media_type} url={media_url}")
 else:
-    print("📄 メディアなし(テキスト投稿)\n")
+    print("📄 メディアなし")
 
-r = post_to_threads(text, media_type, media_url)
-if r and r.status_code == 200:
-    print("✅ SUCCESS")
+r = post_to_threads(text, media_url, media_type)
+if r.status_code == 200:
+    print(f"✅ SUCCESS")
 else:
-    print("❌ FAILED")
+    print(f"❌ FAILED: {r.status_code} {r.text}")
