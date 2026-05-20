@@ -21,20 +21,8 @@ MENUS = [
 ]
 
 def get_media():
-    """動画9割・画像1割で選択（ななみアビゲイル仕様）"""
-    images = []
+    """動画のみ選択（画像は使わない）"""
     videos = []
-    try:
-        r = requests.get(GITHUB_API_BASE + "images")
-        if r.status_code == 200:
-            files = r.json()
-            if isinstance(files, list):
-                for f in files:
-                    name = f["name"].lower()
-                    if name.endswith((".jpg", ".jpeg", ".png", ".webp")):
-                        url = GITHUB_RAW_BASE + "images/" + f["name"].replace(" ", "_")
-                        images.append((url, "IMAGE"))
-    except: pass
     try:
         r = requests.get(GITHUB_API_BASE + "videos")
         if r.status_code == 200:
@@ -47,13 +35,7 @@ def get_media():
                         videos.append((url, "VIDEO"))
     except: pass
 
-    # 比率制御: 動画9割・画像1割
-    use_video = random.random() < 0.9
-    if use_video and videos:
-        return random.choice(videos)
-    elif images:
-        return random.choice(images)
-    elif videos:  # 画像がない場合は動画にフォールバック
+    if videos:
         return random.choice(videos)
     return None, None
 
