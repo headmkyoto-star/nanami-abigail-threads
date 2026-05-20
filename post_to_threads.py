@@ -95,13 +95,10 @@ def generate_post():
 def post_to_threads(text, media_url=None, media_type=None):
     if media_type == "IMAGE":
         params = {"media_type": "IMAGE", "image_url": media_url, "text": text, "access_token": ACCESS_TOKEN}
-        wait_sec = 30
     elif media_type == "VIDEO":
         params = {"media_type": "VIDEO", "video_url": media_url, "text": text, "access_token": ACCESS_TOKEN}
-        wait_sec = 60
     else:
         params = {"media_type": "TEXT", "text": text, "access_token": ACCESS_TOKEN}
-        wait_sec = 5
 
     r = requests.post(f"https://graph.threads.net/v1.0/{USER_ID}/threads", params=params)
     if r.status_code != 200:
@@ -113,8 +110,36 @@ def post_to_threads(text, media_url=None, media_type=None):
 
     cid = r.json().get("id")
     print(f"✅ コンテナ作成: {cid}")
-    print(f"⏳ {wait_sec}秒待機...")
-    time.sleep(wait_sec)
+
+    # 動画の場合はステータスをポーリング（最大5分）
+    if media_type == "VIDEO":
+        for i in range(30):
+            time.sleep(10)
+            try:
+                status_r = requests.get(
+                    f"https://graph.threads.net/v1.0/{cid}",
+                    params={"fields": "status,error_message", "access_token": ACCESS_TOKEN}
+                )
+                status_data = status_r.json()
+                status = status_data.get("status", "")
+                print(f"動画処理ステータス ({i+1}/30): {status}")
+                if status == "FINISHED":
+                    print("✅ 動画処理完了")
+                    break
+                if status == "ERROR":
+                    err_msg = status_data.get("error_message", "Unknown error")
+                    print(f"❌ 動画処理エラー: {err_msg}")
+                    print("📝 テキストのみで再試行")
+                    return post_to_threads(text, None, None)
+            except Exception as e:
+                print(f"ステータス確認エラー: {e}")
+        else:
+            print("⚠️ 動画処理タイムアウト（5分）、それでも公開を試みる")
+    else:
+        # 画像/テキストは短い待機でOK
+        wait_sec = 30 if media_type == "IMAGE" else 5
+        print(f"⏳ {wait_sec}秒待機...")
+        time.sleep(wait_sec)
 
     return requests.post(
         f"https://graph.threads.net/v1.0/{USER_ID}/threads_publish",
