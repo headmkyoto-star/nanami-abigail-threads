@@ -1,5 +1,45 @@
 import anthropic, requests, os, random, time
 
+
+# === 過去5日間と同じ動画を使わない仕組み (auto-injected) ===
+import json as _json_dedup
+import os as _os_dedup
+import datetime as _dt_dedup
+
+_HISTORY_PATH = "state/used_videos_history.json"
+_HISTORY_KEEP_DAYS = 5
+
+def _load_history():
+    if _os_dedup.path.exists(_HISTORY_PATH):
+        try:
+            return _json_dedup.loads(open(_HISTORY_PATH).read())
+        except Exception:
+            return []
+    return []
+
+def _save_history(history):
+    _os_dedup.makedirs(_os_dedup.path.dirname(_HISTORY_PATH), exist_ok=True)
+    with open(_HISTORY_PATH, "w") as f:
+        _json_dedup.dump(history, f, ensure_ascii=False, indent=2)
+
+def pick_unique_url(all_urls):
+    """過去5日間に使ったURLを除外して選ぶ。全部被ったらリセット。"""
+    history = _load_history()
+    today = _dt_dedup.date.today()
+    cutoff = today - _dt_dedup.timedelta(days=_HISTORY_KEEP_DAYS)
+    recent = [h for h in history if h.get("date", "") > cutoff.isoformat()]
+    used = {h["url"] for h in recent}
+    candidates = [u for u in all_urls if u not in used]
+    if not candidates:
+        candidates = all_urls
+    chosen = random.choice(candidates)
+    recent.append({"date": today.isoformat(), "url": chosen})
+    _save_history(recent[-(_HISTORY_KEEP_DAYS + 1):])
+    print(f"[dedup] 選択: {chosen} (除外{len(used)}件/候補{len(candidates)}件)")
+    return chosen
+# === /5日間重複防止 ===
+
+
 ACCESS_TOKEN = os.environ.get("THREADS_ACCESS_TOKEN", "")
 USER_ID = os.environ.get("THREADS_USER_ID", "")
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
@@ -36,7 +76,7 @@ def get_media():
     except: pass
 
     if videos:
-        return random.choice(videos)
+        return pick_unique_url(videos)
     return None, None
 
 def generate_post():
