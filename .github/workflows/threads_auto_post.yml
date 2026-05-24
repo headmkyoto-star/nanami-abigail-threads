@@ -3,6 +3,9 @@ name: ななみアビゲイル Threads自動投稿
 on:
   workflow_dispatch:  # cron-job.org からHTTPで呼び出す
 
+permissions:
+  contents: write
+
 jobs:
   post:
     runs-on: ubuntu-latest
@@ -19,3 +22,17 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python post_to_threads.py
+
+      - name: Commit video history (skip ci)
+        if: success()
+        run: |
+          if [ -n "$(git status --porcelain state/)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add state/
+            git commit -m "Update video history [skip ci]"
+            git push
+          else
+            echo "state変更なし"
+          fi
+
