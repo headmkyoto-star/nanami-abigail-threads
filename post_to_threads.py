@@ -28,14 +28,14 @@ def pick_unique_url(all_urls):
     today = _dt_dedup.date.today()
     cutoff = today - _dt_dedup.timedelta(days=_HISTORY_KEEP_DAYS)
     recent = [h for h in history if h.get("date", "") > cutoff.isoformat()]
-    used = {h["url"] for h in recent}
-    candidates = [u for u in all_urls if u not in used]
+    used = {(h["url"][0] if isinstance(h["url"], (list, tuple)) else h["url"]) for h in recent}
+    candidates = [u for u in all_urls if u[0] not in used]
     if not candidates:
         candidates = all_urls
     chosen = random.choice(candidates)
-    recent.append({"date": today.isoformat(), "url": chosen})
+    recent.append({"date": today.isoformat(), "url": chosen[0]})
     _save_history(recent[-(_HISTORY_KEEP_DAYS + 1):])
-    print(f"[dedup] 選択: {chosen} (除外{len(used)}件/候補{len(candidates)}件)")
+    print(f"[dedup] 選択: {chosen[0]} (除外{len(used)}件/候補{len(candidates)}件)")
     return chosen
 # === /5日間重複防止 ===
 
