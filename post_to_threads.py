@@ -79,6 +79,7 @@ import json as _mjson, os as _mos, datetime as _mdt
 MENU_CONFIG_PATH = "config/menus.json"
 _MENU_STATE_PATH = "state/last_menu.json"
 DEFAULT_MENUS = ["ドライヘッドスパ","アロママッサージ","小顔矯正コルギ"]
+DEFAULT_STORE = "祇園"
 
 MENU_SPECS = {
     "ドライヘッドスパ": {
@@ -184,9 +185,28 @@ def pick_menu():
     return chosen
 
 
+STORE_OPENINGS = {
+    "祇園": ["関西の人で", "📍祇園四条駅から徒歩5分", "祇園四条駅のすぐ近くで", "八坂神社のすぐ近くで", "京都祇園で", "京都の人で"],
+    "河原町": ["関西の人で", "📍京都河原町駅から徒歩5分", "四条河原町のすぐ近くで", "京都河原町で", "京都の人で"],
+}
+
+
+def load_store():
+    """config/menus.json の store（祇園 / 河原町）。なければ DEFAULT_STORE"""
+    try:
+        with open(MENU_CONFIG_PATH, encoding="utf-8") as f:
+            s = _mjson.load(f).get("store")
+        if s in STORE_OPENINGS:
+            return s
+    except Exception:
+        pass
+    return DEFAULT_STORE
+
+
 def generate_post():
     client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
-    opening = random.choice(OPENING_PHRASES)
+    store = load_store()
+    opening = random.choice(STORE_OPENINGS.get(store) or OPENING_PHRASES)
     menu = pick_menu()
     spec = MENU_SPECS[menu]
     if menu == "ドライヘッドスパ":
@@ -195,7 +215,7 @@ def generate_post():
         ng_price = "- 金額や分数を書く（ドライヘッドスパ以外は価格を一切出さない）"
     examples = "\n".join("- " + e for e in spec["examples"])
 
-    prompt = f"""ヘッドミント京都祇園店（ドライヘッドスパ専門のリラクゼーションサロン）で働く若い女性セラピスト「ななみアビゲイル」として、Threadsの短い営業投稿を作成してください。
+    prompt = f"""ヘッドミント京都{store}店（ドライヘッドスパ専門のリラクゼーションサロン）で働く若い女性セラピスト「ななみアビゲイル」として、Threadsの短い営業投稿を作成してください。
 
 【絶対ルール】
 - 投稿は **必ず以下の冒頭フレーズで始める**: 「{opening}」
