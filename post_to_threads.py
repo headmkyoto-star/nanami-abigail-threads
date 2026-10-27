@@ -340,7 +340,13 @@ else:
     print("📄 メディアなし")
 
 r = post_to_threads(text, media_url, media_type)
-if r.status_code == 200:
-    print(f"✅ SUCCESS")
+try:
+    body = r.json()
+except Exception:
+    body = {}
+print(f"📡 publish応答: {r.status_code} {str(body)[:300]}")
+if r.status_code == 200 and body.get("id"):
+    print(f"✅ SUCCESS id={body.get('id')}")
 else:
-    print(f"❌ FAILED: {r.status_code} {r.text}")
+    print(f"❌ FAILED: {r.status_code} {r.text[:300]}")
+    exit(1)
