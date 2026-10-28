@@ -58,17 +58,27 @@ OPENING_PHRASES = [
 def get_media():
     """動画のみ選択（画像は使わない）"""
     videos = []
+    # リポジトリ内の videos/ フォルダを直接読む（GitHub APIの回数制限で動画なしになるのを防ぐ）
+    names = []
     try:
-        r = requests.get(GITHUB_API_BASE + "videos")
-        if r.status_code == 200:
-            files = r.json()
-            if isinstance(files, list):
-                for f in files:
-                    name = f["name"].lower()
-                    if name.endswith((".mp4", ".mov")):
-                        url = GITHUB_RAW_BASE + "videos/" + f["name"].replace(" ", "_")
-                        videos.append((url, "VIDEO"))
-    except: pass
+        names = sorted(os.listdir("videos"))
+        print(f"VIDEO_LOCAL_COUNT:{len(names)}")
+    except Exception as e:
+        print(f"VIDEO_LOCAL_ERROR:{e}")
+    if not names:
+        # 念のための予備：APIで一覧を取得
+        try:
+            r = requests.get(GITHUB_API_BASE + "videos", timeout=15)
+            print(f"VIDEO_API_STATUS:{r.status_code}")
+            if r.status_code == 200 and isinstance(r.json(), list):
+                names = [f["name"] for f in r.json()]
+        except Exception as e:
+            print(f"VIDEO_API_ERROR:{e}")
+    for n in names:
+        if n.lower().endswith((".mp4", ".mov")):
+            f = {"name": n}
+            url = GITHUB_RAW_BASE + "videos/" + f["name"].replace(" ", "_")
+            videos.append((url, "VIDEO"))
 
     if videos:
         return pick_unique_url(videos)
